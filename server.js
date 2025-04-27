@@ -5,15 +5,16 @@ const cors = require('cors');
 
 const app = express();
 
-// CORS: Allow only your frontend Render URL
+// CORS: Allow only your frontend Render URL (DASH, not underscore!)
 app.use(cors({
-  origin: 'https://washerman_frontend.onrender.com'
+  origin: 'https://washerman-frontend.onrender.com'
 }));
 
 app.use(express.json());
 app.use(express.static('public'));
 
-// Connect to MongoDB Atlas (not localhost)
+// Connect to MongoDB Atlas (not localhost!)
+// Make sure your Render Environment variable MONGODB_URI is set to your Atlas URI with the db name
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true

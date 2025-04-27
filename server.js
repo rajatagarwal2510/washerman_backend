@@ -2,14 +2,24 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
+
 const app = express();
+
+// CORS: Allow only your frontend Render URL
 app.use(cors({
-  origin: 'https://washerman_frontend.onrender.com' // Your frontend URL
+  origin: 'https://washerman_frontend.onrender.com'
 }));
-// Connect to MongoDB with improved error handling
-mongoose.connect('mongodb://localhost:27017/washerman')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// Connect to MongoDB Atlas (not localhost)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB Atlas'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -26,7 +36,7 @@ userSchema.pre('save', async function(next) {
 
 const User = mongoose.model('User', userSchema);
 
-// Order Schema with expanded status options
+// Order Schema
 const orderSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   customerName: String,
@@ -44,24 +54,16 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.model('Order', orderSchema);
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
 // ROUTES
 
 // Registration
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password, role } = req.body;
-    
-    // Check if user already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Username already exists' });
-    } // FIXED: Added missing closing curly brace here
-    
+    }
     const user = new User({ username, password, role });
     await user.save();
     res.status(201).json({ success: true });
@@ -75,11 +77,9 @@ app.post('/api/login', async (req, res) => {
   try {
     const { username, password, role } = req.body;
     const user = await User.findOne({ username, role });
-    
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-
     res.json({
       success: true,
       id: user._id,
@@ -94,17 +94,15 @@ app.post('/api/login', async (req, res) => {
 // Create new order
 app.post('/api/orders', async (req, res) => {
   try {
-    const { userId, clothes, washType, returnTime, customerName } = req.body;
-    
+    const { userId, clothes, washType, returnTime, customerName, username } = req.body;
     const order = new Order({
       customer: userId,
-      customerName: customerName || req.body.username,
+      customerName: customerName || username,
       clothes,
       washType,
       returnTime,
-      status: 'Pending' // Initial status is Pending (waiting for pickup)
+      status: 'Pending'
     });
-    
     await order.save();
     res.status(201).json({ success: true, order });
   } catch (error) {
@@ -115,8 +113,7 @@ app.post('/api/orders', async (req, res) => {
 // Get orders by user ID
 app.get('/api/orders/user/:userId', async (req, res) => {
   try {
-    const orders = await Order.find({ customer: req.params.userId })
-                            .sort({ createdAt: -1 });
+    const orders = await Order.find({ customer: req.params.userId }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -136,7 +133,6 @@ app.get('/api/orders', async (req, res) => {
 // Update order status
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
-    // Validate status to ensure it's one of the allowed values
     const validStatuses = ['Pending', 'Picked Up', 'Washing', 'Ready', 'Delivered'];
     if (!validStatuses.includes(req.body.status)) {
       return res.status(400).json({
@@ -144,20 +140,17 @@ app.put('/api/orders/:id/status', async (req, res) => {
         message: 'Invalid status value'
       });
     }
-    
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       { status: req.body.status },
       { new: true }
     );
-    
     if (!order) {
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
-    
     res.json({ success: true, order });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -181,8 +174,7 @@ app.put('/api/orders/:id/rider', async (req, res) => {
 // Get orders by status
 app.get('/api/orders/status/:status', async (req, res) => {
   try {
-    const orders = await Order.find({ status: req.params.status })
-                            .sort({ createdAt: -1 });
+    const orders = await Order.find({ status: req.params.status }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -190,7 +182,6 @@ app.get('/api/orders/status/:status', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

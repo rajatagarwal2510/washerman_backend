@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const app = express();
-
+app.use(cors({
+  origin: 'https://washerman_frontend.onrender.com' // Your frontend URL
+}));
 // Connect to MongoDB with improved error handling
 mongoose.connect('mongodb://localhost:27017/washerman')
   .then(() => console.log('Connected to MongoDB'))
